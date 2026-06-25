@@ -1,2 +1,2 @@
-praisonaiagents
-praisonai
+pyTelegramBotAPI
+google-generativeai
