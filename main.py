@@ -25,10 +25,9 @@ SYSTEM_INSTRUCTION = (
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# 3. Direct Gemini Call (Tries stable v1 first, then v1beta)
+# 3. Direct Gemini Call (Uses v1beta for reliable systemInstruction support)
 def ask_gemini(user_prompt):
-    # Try stable v1 first (the industry standard for gemini-1.5-flash)
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{
@@ -41,28 +40,11 @@ def ask_gemini(user_prompt):
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        
-        # If stable v1 isn't working, try v1beta
-        if response.status_code == 404:
-            alt_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-            response = requests.post(alt_url, json=payload, headers=headers)
-            
         if response.status_code == 200:
             data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
         else:
-            error_data = response.text
-            # If Google still returns 404, the API isn't enabled on this key's project
-            if "not found" in error_data.lower() or response.status_code == 404:
-                return (
-                    "❌ API KEY ERROR: This key doesn't have the Gemini API enabled.\n\n"
-                    "👉 **How to fix this in 30 seconds:**\n"
-                    "1. Go back to Google AI Studio.\n"
-                    "2. Tap the blue **'Create API key'** button.\n"
-                    "3. Select **'Create API key in NEW project'** (Do NOT choose an existing project).\n"
-                    "4. Copy that new key, paste it into Render under GEMINI_API_KEY, and click Save!"
-                )
-            return f"❌ Google API Error (Status {response.status_code}):\n{error_data}"
+            return f"❌ Google API Error (Status {response.status_code}):\n{response.text}"
             
     except Exception as e:
         return f"❌ HTTP Connection Error:\n{str(e)}"
