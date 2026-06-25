@@ -1,6 +1,7 @@
+```python
 import os
 import telebot
-import google.generativeai as genai
+import requests
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
 
@@ -13,40 +14,54 @@ def run_port_listener():
 
 threading.Thread(target=run_port_listener, daemon=True).start()
 
-# 2. Setup API Keys
+# 2. Setup Bot & API Keys
 API_KEY = os.getenv("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# Force configuration
-genai.configure(api_key=API_KEY or "MISSING_KEY")
-
 SYSTEM_INSTRUCTION = (
     "You are an expert sales manager for an industrial Slotted Angle Racks business. "
-    "Talk to warehouse managers and factory owners to provide professional support."
-)
-
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=SYSTEM_INSTRUCTION
+    "Talk to warehouse managers and factory owners to provide professional support "
+    "about industrial racking solutions, heavy duty storage racks, and configurations."
 )
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# 3. Handle incoming Telegram messages and print errors to chat
+# 3. Direct Gemini Call (Bypasses buggy SDK)
+def ask_gemini(user_prompt):
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    headers = {'Content-Type': 'application/json'}
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": user_prompt}]
+        }],
+        "systemInstruction": {
+            "parts": [{"text": SYSTEM_INSTRUCTION}]
+        }
+    }
+    
+    response = requests.post(url, json=payload, headers=headers)
+    
+    if response.status_code == 200:
+        data = response.json()
+        try:
+            return data['candidates'][0]['content']['parts'][0]['text']
+        except (KeyError, IndexError):
+            return "⚠️ Received an unexpected response format from AI engine."
+    else:
+        # Give clear diagnostic info if Google rejects the request
+        return f"❌ Google API Error (Status {response.status_code}):\n{response.text}"
+
+# 4. Handle Telegram Messages
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    try:
-        # Check if key looks empty
-        if not API_KEY or API_KEY == "":
-            bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing or empty in Render Environment settings.")
-            return
-            
-        response = model.generate_content(message.text)
-        bot.reply_to(message, response.text)
-    except Exception as e:
-        # This will reply with the EXACT error message from Google
-        error_msg = f"❌ AI Engine Error:\n{str(e)}"
-        bot.reply_to(message, error_msg)
+    if not API_KEY:
+        bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing in Render Settings.")
+        return
+        
+    # Get direct response from Gemini
+    ai_response = ask_gemini(message.text)
+    bot.reply_to(message, ai_response)
 
-print("🚀 Diagnostic Bot is active!")
+print("🚀 SDK-free Gemini Bot is active and running!")
 bot.infinity_polling()
