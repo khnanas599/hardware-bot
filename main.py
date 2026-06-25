@@ -62,5 +62,3 @@ def handle_message(message):
 
 print("🚀 SDK-free Gemini Bot is active and running!")
 bot.infinity_polling()
-
-```
