@@ -26,9 +26,9 @@ SYSTEM_INSTRUCTION = (
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# 3. Direct Gemini Call (Bypasses buggy SDK)
+# 3. Direct Gemini Call (Using v1beta for reliable REST access)
 def ask_gemini(user_prompt):
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     headers = {'Content-Type': 'application/json'}
     
     payload = {
@@ -40,28 +40,27 @@ def ask_gemini(user_prompt):
         }
     }
     
-    response = requests.post(url, json=payload, headers=headers)
-    
-    if response.status_code == 200:
-        data = response.json()
-        try:
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
-        except (KeyError, IndexError):
-            return "⚠️ Received an unexpected response format from AI engine."
-    else:
-        # Give clear diagnostic info if Google rejects the request
-        return f"❌ Google API Error (Status {response.status_code}):\n{response.text}"
+        else:
+            return f"❌ Google API Error (Status {response.status_code}):\n{response.text}"
+    except Exception as e:
+        return f"❌ HTTP Connection Error:\n{str(e)}"
 
 # 4. Handle Telegram Messages
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     if not API_KEY:
-        bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing in Render Settings.")
+        bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing in Render settings.")
         return
         
-    # Get direct response from Gemini
     ai_response = ask_gemini(message.text)
     bot.reply_to(message, ai_response)
 
 print("🚀 SDK-free Gemini Bot is active and running!")
 bot.infinity_polling()
+
+```
