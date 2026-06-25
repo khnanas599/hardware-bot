@@ -1,8 +1,18 @@
+python
 import os
 import telebot
 import requests
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
+
+# ══════════════════════════════════════════════════════════════
+# 📝 EDIT YOUR BUSINESS DETAILS BELOW inside the quotes (""):
+# ══════════════════════════════════════════════════════════════
+COMPANY_NAME = "Anas Industrial Racks"  # Change to your real business name
+PHONE_NUMBER = "+91 98765 43210"       # Change to your phone/WhatsApp number
+EMAIL_ADDRESS = "sales@yourcompany.com" # Change to your business email
+WEBSITE_URL = "www.yourcompany.com"     # Change to your website link
+# ══════════════════════════════════════════════════════════════
 
 # 1. Start background web listener for Render
 def run_port_listener():
@@ -18,18 +28,26 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 SYSTEM_INSTRUCTION = (
-    "You are an expert sales manager for an industrial Slotted Angle Racks business. "
+    f"You are an expert sales manager at '{COMPANY_NAME}', an industrial Slotted Angle Racks business. "
     "Talk to warehouse managers and factory owners to provide professional support "
-    "about industrial racking solutions, heavy duty storage racks, and configurations."
+    "about industrial racking solutions, heavy duty storage racks, and configurations.\n\n"
+    "When a user asks for contact details, a quote, or when you are wrapping up a professional sales pitch, "
+    "you MUST always sign off with these exact contact details:\n"
+    f"👤 Contact Person: Expert Sales Manager\n"
+    f"🏢 Company: {COMPANY_NAME}\n"
+    f"📞 Phone/WhatsApp: {PHONE_NUMBER}\n"
+    f"✉️ Email: {EMAIL_ADDRESS}\n"
+    f"🌐 Website: {WEBSITE_URL}\n\n"
+    "Never use generic placeholder brackets like [Your Name] in your final output."
 )
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# 3. Triple-Fallback Gemini API Connection (Bulletproof)
+# 3. Triple-Fallback Gemini API Connection
 def ask_gemini(user_prompt):
     headers = {'Content-Type': 'application/json'}
     
-    # --- TRY 1: Call active gemini-2.5-flash on v1beta ---
+    # Try 1: Gemini 2.5 Flash on v1beta
     url_25 = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
     payload_25 = {
         "contents": [{
@@ -47,7 +65,7 @@ def ask_gemini(user_prompt):
     except Exception:
         pass
 
-    # --- TRY 2: Fallback to gemini-1.5-flash-latest on v1beta ---
+    # Try 2: Gemini 1.5 Flash Latest on v1beta
     url_15_latest = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={API_KEY}"
     try:
         response = requests.post(url_15_latest, json=payload_25, headers=headers)
@@ -57,8 +75,7 @@ def ask_gemini(user_prompt):
     except Exception:
         pass
 
-    # --- TRY 3: Absolute Bulletproof Fallback (Stable v1) ---
-    # Prepend system instructions inside prompt to avoid "systemInstruction" 400 error
+    # Try 3: Stable v1 Fallback
     url_v1 = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     merged_prompt = f"Instructions: {SYSTEM_INSTRUCTION}\n\nUser Question: {user_prompt}"
     payload_v1 = {
@@ -86,6 +103,5 @@ def handle_message(message):
     bot.reply_to(message, ai_response)
 
 print("🚀 Bot is running!")
-# Clears old Telegram webhook queue to prevent 409 conflict errors instantly
 bot.delete_webhook(drop_pending_updates=True)
 bot.infinity_polling()
