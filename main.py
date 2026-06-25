@@ -25,11 +25,13 @@ SYSTEM_INSTRUCTION = (
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# 3. Direct Gemini Call (Uses v1beta for reliable systemInstruction support)
+# 3. Triple-Fallback Gemini API Connection (Bulletproof)
 def ask_gemini(user_prompt):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     headers = {'Content-Type': 'application/json'}
-    payload = {
+    
+    # --- TRY 1: Call active gemini-2.5-flash on v1beta ---
+    url_25 = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
+    payload_25 = {
         "contents": [{
             "parts": [{"text": user_prompt}]
         }],
@@ -37,15 +39,40 @@ def ask_gemini(user_prompt):
             "parts": [{"text": SYSTEM_INSTRUCTION}]
         }
     }
-    
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url_25, json=payload_25, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return data['candidates'][0]['content']['parts'][0]['text']
+    except Exception:
+        pass
+
+    # --- TRY 2: Fallback to gemini-1.5-flash-latest on v1beta ---
+    url_15_latest = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={API_KEY}"
+    try:
+        response = requests.post(url_15_latest, json=payload_25, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return data['candidates'][0]['content']['parts'][0]['text']
+    except Exception:
+        pass
+
+    # --- TRY 3: Absolute Bulletproof Fallback (Stable v1) ---
+    # Prepend system instructions inside prompt to avoid "systemInstruction" 400 error
+    url_v1 = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    merged_prompt = f"Instructions: {SYSTEM_INSTRUCTION}\n\nUser Question: {user_prompt}"
+    payload_v1 = {
+        "contents": [{
+            "parts": [{"text": merged_prompt}]
+        }]
+    }
+    try:
+        response = requests.post(url_v1, json=payload_v1, headers=headers)
         if response.status_code == 200:
             data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
         else:
             return f"❌ Google API Error (Status {response.status_code}):\n{response.text}"
-            
     except Exception as e:
         return f"❌ HTTP Connection Error:\n{str(e)}"
 
@@ -53,10 +80,12 @@ def ask_gemini(user_prompt):
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     if not API_KEY:
-        bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing in Render settings.")
+        bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing.")
         return
     ai_response = ask_gemini(message.text)
     bot.reply_to(message, ai_response)
 
 print("🚀 Bot is running!")
+# Clears old Telegram webhook queue to prevent 409 conflict errors instantly
+bot.delete_webhook(drop_pending_updates=True)
 bot.infinity_polling()
