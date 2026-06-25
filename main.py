@@ -1,4 +1,3 @@
-```python
 import os
 import telebot
 import requests
@@ -9,7 +8,7 @@ import threading
 def run_port_listener():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
-    print(f"🌍 Web port {port} active")
+    print("🌍 Web port active")
     server.serve_forever()
 
 threading.Thread(target=run_port_listener, daemon=True).start()
@@ -26,11 +25,10 @@ SYSTEM_INSTRUCTION = (
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# 3. Direct Gemini Call (Using v1beta for reliable REST access)
+# 3. Direct Gemini Call
 def ask_gemini(user_prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     headers = {'Content-Type': 'application/json'}
-    
     payload = {
         "contents": [{
             "parts": [{"text": user_prompt}]
@@ -39,7 +37,6 @@ def ask_gemini(user_prompt):
             "parts": [{"text": SYSTEM_INSTRUCTION}]
         }
     }
-    
     try:
         response = requests.post(url, json=payload, headers=headers)
         if response.status_code == 200:
@@ -56,9 +53,8 @@ def handle_message(message):
     if not API_KEY:
         bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing in Render settings.")
         return
-        
     ai_response = ask_gemini(message.text)
     bot.reply_to(message, ai_response)
 
-print("🚀 SDK-free Gemini Bot is active and running!")
+print("🚀 Bot is running!")
 bot.infinity_polling()
