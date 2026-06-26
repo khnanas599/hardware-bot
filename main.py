@@ -1,4 +1,4 @@
-python
+```python
 import os
 import telebot
 import requests
@@ -11,7 +11,7 @@ import threading
 COMPANY_NAME = "Anas Industrial Racks"  # Change to your real business name
 PHONE_NUMBER = "+91 98765 43210"       # Change to your phone/WhatsApp number
 EMAIL_ADDRESS = "sales@yourcompany.com" # Change to your business email
-WEBSITE_URL = "www.yourcompany.com"     # Change to your website link
+WEBSITE_URL = "[www.yourcompany.com](https://www.yourcompany.com)"     # Change to your website link
 # ══════════════════════════════════════════════════════════════
 
 # 1. Start background web listener for Render
@@ -48,7 +48,7 @@ def ask_gemini(user_prompt):
     headers = {'Content-Type': 'application/json'}
     
     # Try 1: Gemini 2.5 Flash on v1beta
-    url_25 = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
+    url_25 = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){API_KEY}"
     payload_25 = {
         "contents": [{
             "parts": [{"text": user_prompt}]
@@ -66,7 +66,7 @@ def ask_gemini(user_prompt):
         pass
 
     # Try 2: Gemini 1.5 Flash Latest on v1beta
-    url_15_latest = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={API_KEY}"
+    url_15_latest = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=){API_KEY}"
     try:
         response = requests.post(url_15_latest, json=payload_25, headers=headers)
         if response.status_code == 200:
@@ -76,7 +76,7 @@ def ask_gemini(user_prompt):
         pass
 
     # Try 3: Stable v1 Fallback
-    url_v1 = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    url_v1 = f"[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=){API_KEY}"
     merged_prompt = f"Instructions: {SYSTEM_INSTRUCTION}\n\nUser Question: {user_prompt}"
     payload_v1 = {
         "contents": [{
@@ -105,3 +105,4 @@ def handle_message(message):
 print("🚀 Bot is running!")
 bot.delete_webhook(drop_pending_updates=True)
 bot.infinity_polling()
+
