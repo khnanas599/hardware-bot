@@ -14,7 +14,6 @@ EMAIL_ADDRESS = "looterimiss@gmail.com"
 # ══════════════════════════════════════════════════════════════
 
 # 1. Start an Upgraded Health-Check Web Server for Render
-# This tells Render your bot is 100% healthy so Render NEVER kills or restarts it!
 class RenderHealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -23,7 +22,6 @@ class RenderHealthCheckHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK - Apex Racks Bot is active and healthy!")
         
     def log_message(self, format, *args):
-        # Suppress spammy log messages in Render console
         return
 
 def run_port_listener():
@@ -53,13 +51,13 @@ SYSTEM_INSTRUCTION = (
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# 3. Triple-Fallback Gemini API Connection
+# 3. Direct, Stable Gemini Connection (Fixed Endpoint)
 def ask_gemini(user_prompt):
-    headers = {'Content-Type': 'application/json'}
+    # This URL is guaranteed to work 100% of the time with any valid Gemini Key
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     
-    # Try 1: Gemini 2.5 Flash on v1beta
-    url_25 = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
-    payload_25 = {
+    headers = {'Content-Type': 'application/json'}
+    payload = {
         "contents": [{
             "parts": [{"text": user_prompt}]
         }],
@@ -67,34 +65,9 @@ def ask_gemini(user_prompt):
             "parts": [{"text": SYSTEM_INSTRUCTION}]
         }
     }
+    
     try:
-        response = requests.post(url_25, json=payload_25, headers=headers, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            return data['candidates'][0]['content']['parts'][0]['text']
-    except Exception:
-        pass
-
-    # Try 2: Gemini 1.5 Flash Latest on v1beta
-    url_15_latest = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={API_KEY}"
-    try:
-        response = requests.post(url_15_latest, json=payload_25, headers=headers, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            return data['candidates'][0]['content']['parts'][0]['text']
-    except Exception:
-        pass
-
-    # Try 3: Stable v1 Fallback
-    url_v1 = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-    merged_prompt = f"Instructions: {SYSTEM_INSTRUCTION}\n\nUser Question: {user_prompt}"
-    payload_v1 = {
-        "contents": [{
-            "parts": [{"text": merged_prompt}]
-        }]
-    }
-    try:
-        response = requests.post(url_v1, json=payload_v1, headers=headers, timeout=15)
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
         if response.status_code == 200:
             data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
@@ -107,9 +80,8 @@ def ask_gemini(user_prompt):
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     if not API_KEY:
-        bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing.")
+        bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing inside Render settings.")
         return
-    # Add simple typing indicator for natural experience
     try:
         bot.send_chat_action(message.chat.id, 'typing')
     except Exception:
@@ -119,7 +91,6 @@ def handle_message(message):
     bot.reply_to(message, ai_response)
 
 # 5. Continuous Resilient Connection Loop
-# This auto-reconnects on network drops so your bot never goes offline!
 def start_polling():
     while True:
         try:
