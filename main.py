@@ -1,7 +1,8 @@
 import os
+import time
 import telebot
 import requests
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 
 # ══════════════════════════════════════════════════════════════
@@ -12,11 +13,23 @@ PHONE_NUMBER = "+91 85954 24856"
 EMAIL_ADDRESS = "looterimiss@gmail.com"
 # ══════════════════════════════════════════════════════════════
 
-# 1. Start background web listener for Render
+# 1. Start an Upgraded Health-Check Web Server for Render
+# This tells Render your bot is 100% healthy so Render NEVER kills or restarts it!
+class RenderHealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK - Apex Racks Bot is active and healthy!")
+        
+    def log_message(self, format, *args):
+        # Suppress spammy log messages in Render console
+        return
+
 def run_port_listener():
     port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
-    print("🌍 Web port active")
+    server = HTTPServer(('0.0.0.0', port), RenderHealthCheckHandler)
+    print(f"🌍 Render Health Check active on port {port}")
     server.serve_forever()
 
 threading.Thread(target=run_port_listener, daemon=True).start()
@@ -55,7 +68,7 @@ def ask_gemini(user_prompt):
         }
     }
     try:
-        response = requests.post(url_25, json=payload_25, headers=headers)
+        response = requests.post(url_25, json=payload_25, headers=headers, timeout=15)
         if response.status_code == 200:
             data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
@@ -65,7 +78,7 @@ def ask_gemini(user_prompt):
     # Try 2: Gemini 1.5 Flash Latest on v1beta
     url_15_latest = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={API_KEY}"
     try:
-        response = requests.post(url_15_latest, json=payload_25, headers=headers)
+        response = requests.post(url_15_latest, json=payload_25, headers=headers, timeout=15)
         if response.status_code == 200:
             data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
@@ -81,7 +94,7 @@ def ask_gemini(user_prompt):
         }]
     }
     try:
-        response = requests.post(url_v1, json=payload_v1, headers=headers)
+        response = requests.post(url_v1, json=payload_v1, headers=headers, timeout=15)
         if response.status_code == 200:
             data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
@@ -96,9 +109,26 @@ def handle_message(message):
     if not API_KEY:
         bot.reply_to(message, "❌ CONFIG ERROR: GEMINI_API_KEY is missing.")
         return
+    # Add simple typing indicator for natural experience
+    try:
+        bot.send_chat_action(message.chat.id, 'typing')
+    except Exception:
+        pass
+        
     ai_response = ask_gemini(message.text)
     bot.reply_to(message, ai_response)
 
-print("🚀 Bot is running!")
-bot.delete_webhook(drop_pending_updates=True)
-bot.infinity_polling()
+# 5. Continuous Resilient Connection Loop
+# This auto-reconnects on network drops so your bot never goes offline!
+def start_polling():
+    while True:
+        try:
+            print("🚀 Starting resilient Telegram Polling...")
+            bot.delete_webhook(drop_pending_updates=True)
+            bot.polling(none_stop=True, interval=0, timeout=20)
+        except Exception as e:
+            print(f"⚠️ Polling crashed: {str(e)}. Reconnecting in 5 seconds...")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    start_polling()
