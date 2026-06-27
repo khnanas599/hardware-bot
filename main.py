@@ -22,7 +22,6 @@ class RenderHealthCheckHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK - Apex Racks Bot is active and healthy!")
         
     def log_message(self, format, *args):
-        # Keeps Render console logs clean
         return
 
 def run_port_listener():
@@ -54,13 +53,10 @@ SYSTEM_INSTRUCTION = (
 # 3. Secure and Reliable SDK Chat Connection
 def ask_gemini(user_prompt):
     try:
-        # Initialize the official Google Generative Model
         model = genai.GenerativeModel(
             model_name="gemini-1.5-flash",
             system_instruction=SYSTEM_INSTRUCTION
         )
-        
-        # Request generation
         response = model.generate_content(user_prompt)
         return response.text
         
@@ -92,14 +88,12 @@ def handle_message(message):
     ai_response = ask_gemini(message.text)
     bot.reply_to(message, ai_response)
 
-# 5. Continuous Resilient Connection Loop (Kills 409 Conflict)
+# 5. Continuous Resilient Connection Loop
 def start_polling():
     while True:
         try:
             print("🚀 Starting resilient Telegram Polling...")
-            # Drop old webhooks and flush pending messages to prevent conflict
             bot.delete_webhook(drop_pending_updates=True)
-            # infinity_polling automatically manages reconnects and delays
             bot.infinity_polling(skip_pending=True, timeout=10, long_polling_timeout=5)
         except Exception as e:
             print(f"⚠️ Polling crashed: {str(e)}. Reconnecting in 5 seconds...")
