@@ -1,3 +1,4 @@
+```python
 import os
 import time
 import telebot
@@ -114,13 +115,3 @@ def start_polling():
 
 if __name__ == "__main__":
     start_polling()
-
-```
-eof
-### **📲 Follow these exact steps to make it work:**
-#### **Step 1: Update your requirements.txt on GitHub**
- 1. Open **requirements.txt** on GitHub.
- 2. Replace everything inside it with these two lines (we removed Google SDK):
-   ```text
-   pyTelegramBotAPI==4.26.0
-   requests==2.32.3
