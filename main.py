@@ -107,14 +107,3 @@ def start_polling():
 
 if __name__ == "__main__":
     start_polling()
-
-```
-eof
-### 📲 Follow these exact steps on your phone now to make it work:
-#### Step 1: Update your requirements.txt on GitHub
- 1. Open **requirements.txt** on GitHub.
- 2. Replace everything inside it with these three lines:
-   ```text
-   pyTelegramBotAPI==4.26.0
-   requests==2.32.3
-   google-generativeai==0.8.3
