@@ -1,7 +1,7 @@
 import os
 import time
 import telebot
-import google.generativeai as genai
+import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 
@@ -22,6 +22,7 @@ class RenderHealthCheckHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK - Apex Racks Bot is active and healthy!")
         
     def log_message(self, format, *args):
+        # Keeps Render console logs clean
         return
 
 def run_port_listener():
@@ -32,9 +33,9 @@ def run_port_listener():
 
 threading.Thread(target=run_port_listener, daemon=True).start()
 
-# 2. Configure Official Google Generative AI SDK
-API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=API_KEY)
+# 2. Get and Clean Keys (Removes any accidental mobile spaces/newlines)
+API_KEY = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip().replace('"', '').replace("'", "")
 
 SYSTEM_INSTRUCTION = (
     f"You are an expert sales manager at '{COMPANY_NAME}', an industrial Slotted Angle Racks business. "
@@ -50,28 +51,40 @@ SYSTEM_INSTRUCTION = (
     f"Always output the real values: Company Name is '{COMPANY_NAME}', Phone is '{PHONE_NUMBER}', and Email is '{EMAIL_ADDRESS}'."
 )
 
-# 3. Secure and Reliable SDK Chat Connection
+# 3. Direct HTTP Gemini Connection (Completely Bypasses Google SDK bugs with AQ. keys)
 def ask_gemini(user_prompt):
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=SYSTEM_INSTRUCTION
-        )
-        response = model.generate_content(user_prompt)
-        return response.text
+    # Direct, official REST endpoints
+    models_to_try = ["gemini-1.5-flash", "gemini-2.5-flash"]
+    headers = {'Content-Type': 'application/json'}
+    
+    last_error_details = ""
+    
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+        payload = {
+            "contents": [{"parts": [{"text": user_prompt}]}],
+            "systemInstruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]}
+        }
         
-    except Exception as e:
-        error_msg = str(e)
-        if "API_KEY_INVALID" in error_msg or "401" in error_msg:
-            return (
-                "❌ API Key Unauthorized:\n"
-                "The GEMINI_API_KEY saved in your Render settings is invalid.\n\n"
-                "Please verify that you copied the key correctly from Google AI Studio and did not include any extra spaces or hidden characters."
-            )
-        return f"❌ AI Connection Error: {error_msg}"
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                return data['candidates'][0]['content']['parts'][0]['text']
+            else:
+                last_error_details = f"Model {model_name} returned Status {response.status_code}: {response.text}"
+        except Exception as e:
+            last_error_details = f"Connection error on {model_name}: {str(e)}"
+            
+    # Return clear diagnostic instructions if it fails
+    return (
+        "❌ AI Connection Error\n\n"
+        f"Diagnostic details:\n{last_error_details}\n\n"
+        "💡 Please double check your Render Environment settings. "
+        "Make sure GEMINI_API_KEY is saved with no leading spaces."
+    )
 
 # 4. Initialize Telegram Bot
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 # Handle Telegram Messages
@@ -88,7 +101,7 @@ def handle_message(message):
     ai_response = ask_gemini(message.text)
     bot.reply_to(message, ai_response)
 
-# 5. Continuous Resilient Connection Loop
+# 5. Continuous Resilient Connection Loop (Kills 409 Conflict)
 def start_polling():
     while True:
         try:
@@ -101,3 +114,13 @@ def start_polling():
 
 if __name__ == "__main__":
     start_polling()
+
+```
+eof
+### **📲 Follow these exact steps to make it work:**
+#### **Step 1: Update your requirements.txt on GitHub**
+ 1. Open **requirements.txt** on GitHub.
+ 2. Replace everything inside it with these two lines (we removed Google SDK):
+   ```text
+   pyTelegramBotAPI==4.26.0
+   requests==2.32.3
